@@ -1,0 +1,16 @@
+# 本来是不需要service的，但是为了jnlp的连接，我这里创建了一个service
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: jenkins-master
+  name: jenkins-service
+  namespace: jenkins
+spec:
+  ports:
+    - port: 8080
+      name: jenkins
+    - port: 50000
+      name: agent
+  selector:
+    app: jenkins-master

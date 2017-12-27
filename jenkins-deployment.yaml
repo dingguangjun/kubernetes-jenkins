@@ -1,0 +1,61 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: jenkins
+  labels:
+    app: jenkins-master
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: jenkins-master
+    spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      # serviceAccountName 后面自己创建，不创建的话，默认的default serviceaccount会无法在jenkins namespace中创建slave等操作
+      serviceAccountName: jenkins-admin
+      containers:
+      - name: jenkins-master
+        image: harbor.quark.com/quark/jenkins:latest
+        ports:
+        - containerPort: 8080
+          name: jenkins
+        - containerPort: 50000
+          name: agent
+          protocol: TCP
+        volumeMounts:
+        - name: docker
+          mountPath: /var/run/docker.sock
+        - name: jenkins-persistent-storage
+          mountPath: /var/jenkins_home
+        # 这里env下的内容，是为了通过registrator将信息注册到consul中，实现fabio路由
+        env:
+        - name: SERVICE_NAME
+          value: jenkins-master
+        - name: SERVICE_TAGS
+          value: urlprefix-jenkins-k8s.quark.com/
+        - name: SERVICE_8080_CHECK_HTTP
+          value: "/login"
+        - name: SERVICE_8080_CHECK_INTERVAL
+          value: "15s"
+        - name: SERVICE_8080_CHECK_TIME
+          value: "1s"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+
+      volumes:
+      - name: docker
+        hostPath:
+          path: /var/run/docker.sock
+      - name: jenkins-persistent-storage
+        persistentVolumeClaim:
+          claimName: jenkins-master-pvc
